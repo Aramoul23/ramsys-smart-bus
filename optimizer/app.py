@@ -11,12 +11,16 @@ from datetime import datetime, date
 
 import qrcode
 from flask import Flask, jsonify, request, render_template, send_from_directory, abort
+from dotenv import load_dotenv
 
 from phone_utils import to_international
+
+load_dotenv()
 
 app = Flask(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ramsys_routing.db')
+SYNC_SECRET_KEY = os.environ.get('SYNC_SECRET_KEY', '')
 
 
 def get_db():
@@ -416,6 +420,102 @@ def index():
     buses = conn.execute('SELECT * FROM buses WHERE is_active = 1').fetchall()
     conn.close()
     return render_template('index.html', buses=buses)
+
+
+# ---------------------------------------------------------------------------
+# Endpoint 5: Receive Route Data Sync (from transportation optimizer)
+# ---------------------------------------------------------------------------
+@app.route('/api/receive-routes', methods=['POST'])
+def receive_routes():
+    """
+    POST /api/receive-routes
+    Receives route_stops + families data from App 1 and replaces local DB content.
+    Requires X-Sync-Key header matching SYNC_SECRET_KEY from .env.
+    """
+    # Validate sync key
+    provided_key = request.headers.get('X-Sync-Key', '')
+    if not SYNC_SECRET_KEY:
+        return jsonify({"error": "SYNC_SECRET_KEY not configured on receiver."}), 500
+    if provided_key != SYNC_SECRET_KEY:
+        return jsonify({"error": "Invalid sync key."}), 403
+
+    payload = request.get_json()
+    if not payload:
+        return jsonify({"error": "Empty JSON payload."}), 400
+
+    families = payload.get('families', [])
+    route_stops = payload.get('route_stops', [])
+
+    if not families:
+        return jsonify({"error": "No families data in payload."}), 400
+
+    conn = get_db()
+    try:
+        # Wipe and replace families
+        conn.execute('DELETE FROM route_stops')
+        conn.execute('DELETE FROM travel_times_morning')
+        conn.execute('DELETE FROM travel_times_afternoon')
+        conn.execute('DELETE FROM students')
+        conn.execute('DELETE FROM families')
+
+        # Insert families
+        for fam in families:
+            conn.execute('''
+                INSERT INTO families (id, family_name, latitude, longitude, student_count, phone_number, cycle_profile)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                fam.get('id'),
+                fam.get('family_name'),
+                fam.get('latitude'),
+                fam.get('longitude'),
+                fam.get('student_count', 0),
+                fam.get('phone_number', ''),
+                fam.get('cycle_profile', 'MIXED'),
+            ))
+
+        # Insert students
+        students = payload.get('students', [])
+        for stu in students:
+            conn.execute('''
+                INSERT INTO students (id, first_name, last_name, family_id, original_lat, original_lon, is_active, address, cycle)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                stu.get('id'),
+                stu.get('first_name'),
+                stu.get('last_name'),
+                stu.get('family_id'),
+                stu.get('original_lat'),
+                stu.get('original_lon'),
+                stu.get('is_active', 1),
+                stu.get('address', ''),
+                stu.get('cycle', ''),
+            ))
+
+        # Insert route_stops
+        for stop in route_stops:
+            conn.execute('''
+                INSERT INTO route_stops (bus_id, family_id, stop_sequence, estimated_pickup_time, session)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                stop.get('bus_id'),
+                stop.get('family_id'),
+                stop.get('stop_sequence'),
+                stop.get('estimated_pickup_time'),
+                stop.get('session', 'morning'),
+            ))
+
+        conn.commit()
+        return jsonify({
+            "status": "ok",
+            "families_synced": len(families),
+            "students_synced": len(students),
+            "stops_synced": len(route_stops),
+        })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": f"Sync failed: {str(e)}"}), 500
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
