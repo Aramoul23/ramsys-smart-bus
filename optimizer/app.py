@@ -138,8 +138,12 @@ def export_route(bus_id, date_str):
         })
 
     # Departure/deadline times from config (match transportation app)
-    departure_time = "07:15" if session == 'morning' else "16:00"
-    school_deadline = "08:30" if session == 'morning' else "17:30"
+    if session == 'afternoon':
+        departure_time = "16:00"
+        school_deadline = "17:30"
+    else:
+        departure_time = "07:15"
+        school_deadline = "08:30"
 
     playlist = {
         "route_id": f"bus_{bus_id}_{date_str}_{session}",
