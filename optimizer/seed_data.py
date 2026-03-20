@@ -22,9 +22,11 @@ def seed():
 
     # --- Buses ---
     buses = [
-        (1, 'Omar', 30, 'standard', 1),
-        (2, 'Karim', 12, 'mini', 1),
-        (3, 'Ahmed', 30, 'standard', 1),
+        (1, 'Driver Ahmed', 30, 'standard', 1),
+        (2, 'Driver Karim', 30, 'standard', 1),
+        (3, 'Driver Omar', 30, 'standard', 1),
+        (4, 'Driver Youssef', 25, 'coaster', 1),
+        (5, 'Driver Bilal', 12, 'mini', 1),
     ]
     cursor.executemany(
         'INSERT INTO buses (id, driver_name, capacity, bus_type, is_active) VALUES (?, ?, ?, ?, ?)',
@@ -101,38 +103,38 @@ def seed():
 
     # --- Route Stops (Bus 1: morning route) ---
     route_stops_bus1 = [
-        (1,  1, 1,  1,  '07:18 AM'),
-        (2,  1, 5,  2,  '07:23 AM'),
-        (3,  1, 10, 3,  '07:28 AM'),
-        (4,  1, 8,  4,  '07:33 AM'),
-        (5,  1, 14, 5,  '07:38 AM'),
-        (6,  1, 4,  6,  '07:43 AM'),
-        (7,  1, 2,  7,  '07:48 AM'),
-        (8,  1, 9,  8,  '07:53 AM'),
-        (9,  1, 3,  9,  '07:58 AM'),
-        (10, 1, 6,  10, '08:03 AM'),
+        (1,  1, 1,  1,  '07:18 AM', 'morning'),
+        (2,  1, 5,  2,  '07:23 AM', 'morning'),
+        (3,  1, 10, 3,  '07:28 AM', 'morning'),
+        (4,  1, 8,  4,  '07:33 AM', 'morning'),
+        (5,  1, 14, 5,  '07:38 AM', 'morning'),
+        (6,  1, 4,  6,  '07:43 AM', 'morning'),
+        (7,  1, 2,  7,  '07:48 AM', 'morning'),
+        (8,  1, 9,  8,  '07:53 AM', 'morning'),
+        (9,  1, 3,  9,  '07:58 AM', 'morning'),
+        (10, 1, 6,  10, '08:03 AM', 'morning'),
     ]
     cursor.executemany(
-        'INSERT INTO route_stops (id, bus_id, family_id, stop_sequence, estimated_pickup_time) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO route_stops (id, bus_id, family_id, stop_sequence, estimated_pickup_time, session) VALUES (?, ?, ?, ?, ?, ?)',
         route_stops_bus1
     )
 
     # --- Route Stops (Bus 2: mini bus, shorter route) ---
     route_stops_bus2 = [
-        (11, 2, 7,  1, '07:20 AM'),
-        (12, 2, 11, 2, '07:26 AM'),
-        (13, 2, 12, 3, '07:32 AM'),
-        (14, 2, 13, 4, '07:38 AM'),
+        (11, 2, 7,  1, '07:20 AM', 'morning'),
+        (12, 2, 11, 2, '07:26 AM', 'morning'),
+        (13, 2, 12, 3, '07:32 AM', 'morning'),
+        (14, 2, 13, 4, '07:38 AM', 'morning'),
     ]
     cursor.executemany(
-        'INSERT INTO route_stops (id, bus_id, family_id, stop_sequence, estimated_pickup_time) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO route_stops (id, bus_id, family_id, stop_sequence, estimated_pickup_time, session) VALUES (?, ?, ?, ?, ?, ?)',
         route_stops_bus2
     )
 
     conn.commit()
     conn.close()
     print("Database seeded successfully!")
-    print(f"  - 3 buses")
+    print(f"  - 5 buses")
     print(f"  - 14 families")
     print(f"  - 24 students")
     print(f"  - 10 stops (Bus 1)")
