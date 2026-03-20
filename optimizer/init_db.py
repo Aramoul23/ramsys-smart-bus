@@ -77,7 +77,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS trip_events (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             bus_id           INTEGER  NOT NULL,
-            family_id        INTEGER  NOT NULL DEFAULT 0,
+            family_id        INTEGER,
             stop_sequence    INTEGER  NOT NULL DEFAULT 0,
             event_type       TEXT     NOT NULL,
             boarded_count    INTEGER  DEFAULT 0,
