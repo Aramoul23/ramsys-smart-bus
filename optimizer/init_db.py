@@ -67,7 +67,7 @@ def init_db():
             family_id             INTEGER REFERENCES families(id),
             stop_sequence         INTEGER,
             estimated_pickup_time TEXT,
-            session               TEXT DEFAULT 'morning'
+            session TEXT NOT NULL DEFAULT 'morning'
         )
     ''')
 
