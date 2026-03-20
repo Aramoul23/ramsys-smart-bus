@@ -73,11 +73,12 @@ def init_db():
 
     # --- Trip events table (driver app writes via WiFi sync) ---
 
+    # trip_events: family_id has NO FK constraint — metadata events use family_id=0
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS trip_events (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             bus_id           INTEGER  NOT NULL,
-            family_id        INTEGER,
+            family_id        INTEGER  NOT NULL DEFAULT 0,
             stop_sequence    INTEGER  NOT NULL DEFAULT 0,
             event_type       TEXT     NOT NULL,
             boarded_count    INTEGER  DEFAULT 0,
@@ -86,8 +87,7 @@ def init_db():
             absent_names     TEXT,
             actual_time      TEXT     NOT NULL,
             session          TEXT     DEFAULT 'morning',
-            notes            TEXT,
-            FOREIGN KEY (bus_id)    REFERENCES buses    (id)
+            notes            TEXT
         )
     ''')
 
