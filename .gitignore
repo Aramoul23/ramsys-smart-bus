@@ -1,0 +1,24 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment variables
+.env
+.env.*
+
+# Database and backups
+optimizer/*.db
+optimizer/*.db.*
+optimizer/*.backup_*
+
+# Logs
+optimizer/*.log
+optimizer/server_log.txt
+
+# OS files
+.DS_Store
+Thumbs.db

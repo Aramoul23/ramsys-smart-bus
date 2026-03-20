@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <title>Ramsys Smart Bus</title>
+    <style>
+        /* ===== RESET & BASE ===== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        /* ===== CONNECTIVITY INDICATOR ===== */
+        #connectivity {
+            position: fixed;
+            top: 8px;
+            right: 8px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #9ca3af;
+            z-index: 1000;
+            transition: background 0.3s;
+        }
+        #connectivity.green { background: #22c55e; }
+        #connectivity.red { background: #ef4444; }
+
+        /* ===== SCREENS ===== */
+        .screen { display: none; height: 100%; flex-direction: column; }
+        .screen.active { display: flex; }
+
+        /* ===== CHARGER MODAL ===== */
+        #charger-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            text-align: center;
+            padding: 40px;
+        }
+        #charger-modal.active { display: flex; }
+        #charger-modal .icon { font-size: 80px; margin-bottom: 20px; }
+        #charger-modal h2 { font-size: 24px; margin-bottom: 12px; }
+        #charger-modal p { font-size: 16px; color: #aaa; line-height: 1.5; }
+
+        /* ===== CHARGING BANNER ===== */
+        #charging-banner {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #dc2626;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 999;
+        }
+        #charging-banner.active { display: block; }
+
+        /* ===== LOAD SCREEN ===== */
+        #load-screen {
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background: #1a1a2e;
+            color: white;
+        }
+        #load-screen h1 { font-size: 28px; margin-bottom: 8px; }
+        #load-screen .subtitle { color: #94a3b8; margin-bottom: 30px; font-size: 14px; }
+        #load-screen input {
+            width: 100%;
+            max-width: 320px;
+            padding: 14px 18px;
+            border: 2px solid #334155;
+            border-radius: 10px;
+            background: #0f172a;
+            color: white;
+            font-size: 18px;
+            text-align: center;
+            letter-spacing: 2px;
+            outline: none;
+        }
+        #load-screen input:focus { border-color: #3b82f6; }
+        #load-screen .hint {
+            color: #64748b;
+            font-size: 12px;
+            margin-top: 10px;
+            max-width: 320px;
+        }
+        #btn-load-route {
+            margin-top: 20px;
+            padding: 14px 40px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            max-width: 320px;
+            width: 100%;
+        }
+        #btn-load-route:disabled { background: #334155; cursor: not-allowed; }
+        #load-status {
+            margin-top: 16px;
+            font-size: 14px;
+            max-width: 320px;
+            text-align: center;
+        }
+
+        /* ===== MAIN ROUTE SCREEN ===== */
+        #route-screen { background: #f0f2f5; }
+        #route-header {
+            background: #1a1a2e;
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #route-header .info { flex: 1; }
+        #route-header .bus-label { font-size: 20px; font-weight: 700; }
+        #route-header .driver-name { font-size: 14px; color: #94a3b8; }
+        #route-header .progress {
+            text-align: right;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+        #route-header .progress strong {
+            color: #3b82f6;
+            font-size: 20px;
+        }
+
+        /* ===== STOP LIST ===== */
+        #stop-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .stop-card {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border-left: 4px solid #e5e7eb;
+            transition: all 0.3s;
+        }
+        .stop-card.current {
+            border-left-color: #3b82f6;
+            box-shadow: 0 2px 8px rgba(59,130,246,0.15);
+        }
+        .stop-card.completed {
+            border-left-color: #22c55e;
+            opacity: 0.7;
+        }
+        .stop-card.skipped {
+            border-left-color: #ef4444;
+            opacity: 0.5;
+        }
+        .stop-card .stop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .stop-card .stop-number {
+            background: #e5e7eb;
+            color: #374151;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 13px;
+        }
+        .stop-card.current .stop-number {
+            background: #3b82f6;
+            color: white;
+        }
+        .stop-card.completed .stop-number {
+            background: #22c55e;
+            color: white;
+        }
+        .stop-card .family-name {
+            font-weight: 700;
+            font-size: 16px;
+            flex: 1;
+            margin-left: 10px;
+        }
+        .stop-card .pickup-time {
+            font-size: 13px;
+            color: #6b7280;
+        }
+        .stop-card .students-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .student-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .student-toggle.present {
+            background: #d1fae5;
+            color: #065f46;
+            border-color: #22c55e;
+        }
+        .student-toggle.absent {
+            background: #fee2e2;
+            color: #991b1b;
+            border-color: #ef4444;
+        }
+        .student-toggle .cycle-badge {
+            font-size: 10px;
+            color: inherit;
+            opacity: 0.7;
+        }
+        .stop-card .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+        .status-badge.boarded { background: #d1fae5; color: #065f46; }
+        .status-badge.partial { background: #fef3c7; color: #92400e; }
+        .status-badge.absent { background: #fee2e2; color: #991b1b; }
+        .status-badge.at-stop { background: #dbeafe; color: #1e40af; }
+
+        /* ===== STOP ACTIONS (Current stop) ===== */
+        .stop-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .stop-actions button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-depart {
+            background: #22c55e;
+            color: white;
+        }
+        .btn-depart:active { background: #16a34a; }
+        .btn-all-absent {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .btn-all-absent:active { background: #fecaca; }
+        .btn-all-absent.flash-red {
+            animation: flashRed 0.5s infinite;
+        }
+        @keyframes flashRed {
+            0%, 100% { background: #fee2e2; }
+            50% { background: #ef4444; color: white; }
+        }
+        .btn-approach-manual {
+            background: #dbeafe;
+            color: #1e40af;
+            font-size: 13px;
+            padding: 8px 12px;
+        }
+
+        /* ===== TIMER BAR ===== */
+        #timer-container {
+            display: none;
+            margin-top: 10px;
+            background: #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 36px;
+            position: relative;
+        }
+        #timer-container.active { display: block; }
+        #timer-bar {
+            height: 100%;
+            background: #3b82f6;
+            width: 100%;
+            transition: width 1s linear, background-color 0.5s;
+        }
+        #timer-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: 700;
+            font-size: 15px;
+            color: #1a1a2e;
+        }
+
+        /* ===== END OF ROUTE ===== */
+        #end-screen {
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        .end-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+        .end-card .icon { font-size: 60px; margin-bottom: 12px; }
+        .end-card h2 { margin-bottom: 16px; }
+        .end-card .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        .end-card .stat { text-align: center; }
+        .end-card .stat .num { font-size: 28px; font-weight: 700; }
+        .end-card .stat .label { font-size: 12px; color: #6b7280; }
+        .end-card .stat.present .num { color: #22c55e; }
+        .end-card .stat.absent .num { color: #ef4444; }
+        .end-card .stat.partial .num { color: #f59e0b; }
+
+        #attendance-report {
+            text-align: left;
+            margin: 20px 0;
+            font-size: 13px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .end-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .end-actions button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-sync {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-print {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        .btn-new-route {
+            background: #1a1a2e;
+            color: white;
+            margin-top: 10px;
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* ===== GPS STATUS ===== */
+        #gps-status {
+            padding: 6px 12px;
+            font-size: 12px;
+            text-align: center;
+            background: #fef3c7;
+            color: #92400e;
+        }
+        #gps-status.active { background: #d1fae5; color: #065f46; }
+        #gps-status.error { background: #fee2e2; color: #991b1b; }
+
+        /* ===== PRINT STYLES ===== */
+        @media print {
+            #route-header, .stop-actions, #connectivity, .btn-sync, .btn-print, .btn-new-route {
+                display: none !important;
+            }
+            .end-card {
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Connectivity indicator -->
+<div id="connectivity"></div>
+
+<!-- Charging banner (mid-route warning) -->
+<div id="charging-banner">⚠️ Branchez le chargeur — batterie faible!</div>
+
+<!-- Charger modal (startup block) -->
+<div id="charger-modal">
+    <div class="icon">🔋</div>
+    <h2>Chargeur requis</h2>
+    <p>Veuillez brancher le chargeur avant de démarrer l'application.<br>Le bus doit rester alimenté pendant le trajet.</p>
+</div>
+
+<!-- ===== SCREEN 1: LOAD ===== -->
+<div id="load-screen" class="screen active">
+    <h1>🚌 Ramsys School</h1>
+    <div class="subtitle">Application Conducteur</div>
+    <input type="text" id="bus-id-input" placeholder="N° du Bus" inputmode="numeric" pattern="[0-9]*">
+    <div class="hint">Entrez le numéro de votre bus puis appuyez sur CHARGER</div>
+    <button id="btn-load-route" disabled>CHARGER LA ROUTE</button>
+    <div id="load-status"></div>
+</div>
+
+<!-- ===== SCREEN 2: ROUTE ===== -->
+<div id="route-screen" class="screen">
+    <div id="route-header">
+        <div class="info">
+            <div class="bus-label" id="header-bus">Bus ?</div>
+            <div class="driver-name" id="header-driver"></div>
+        </div>
+        <div class="progress">
+            <strong id="header-progress">0</strong> / <span id="header-total">0</span><br>
+            <span id="header-students">0 élèves</span>
+        </div>
+    </div>
+    <div id="gps-status">📡 Recherche GPS...</div>
+    <div id="stop-list"></div>
+</div>
+
+<!-- ===== SCREEN 3: END ===== -->
+<div id="end-screen" class="screen">
+    <div class="end-card">
+        <div class="icon">✅</div>
+        <h2>Trajet terminé!</h2>
+        <div id="end-summary"></div>
+        <div class="stats">
+            <div class="stat present">
+                <div class="num" id="stat-present">0</div>
+                <div class="label">Montés</div>
+            </div>
+            <div class="stat absent">
+                <div class="num" id="stat-absent">0</div>
+                <div class="label">Absents</div>
+            </div>
+            <div class="stat partial">
+                <div class="num" id="stat-partial">0</div>
+                <div class="label">Partiels</div>
+            </div>
+        </div>
+        <pre id="attendance-report"></pre>
+        <div class="end-actions">
+            <button class="btn-sync" id="btn-sync">📤 Synchroniser</button>
+            <button class="btn-print" id="btn-print">🖨️ Imprimer</button>
+        </div>
+        <button class="btn-new-route" id="btn-new-route">Nouveau trajet</button>
+    </div>
+</div>
+
+<script>
+// =========================================================================
+// CONSTANTS
+// =========================================================================
+const DB_NAME = 'ramsys_driver_db';
+const DB_VERSION = 1;
+const SMS_GATEWAY_URL = 'http://localhost:8080/send';
+const APPROACH_DISTANCE_METERS = 600;
+const ARRIVAL_DISTANCE_METERS = 50;
+const DRIVER_STOP_WAIT_SECONDS = 180;
+const SYNC_INTERVAL = 30000; // 30 seconds
+
+// =========================================================================
+// STATE
+// =========================================================================
+let db = null;
+let playlist = null;
+let currentStopIndex = 0;
+let routeActive = false;
+let approachSmsFired = false;
+let timerStarted = false;
+let timerInterval = null;
+let watchId = null;
+let BUS_ID = null;
+let SESSION_ID = null;
+
+// =========================================================================
+// INDEXEDDB
+// =========================================================================
+function openIndexedDB() {
+    return new Promise((resolve, reject) => {
+        if (db) { resolve(db); return; }
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onupgradeneeded = (event) => {
+            const database = event.target.result;
+            if (!database.objectStoreNames.contains('sessions')) {
+                database.createObjectStore('sessions', { keyPath: 'session_id' });
+            }
+            if (!database.objectStoreNames.contains('events')) {
+                const eventsStore = database.createObjectStore('events', { keyPath: 'local_id', autoIncrement: true });
+                eventsStore.createIndex('synced', 'synced', { unique: false });
+            }
+            if (!database.objectStoreNames.contains('failed_sms')) {
+                database.createObjectStore('failed_sms', { keyPath: 'id', autoIncrement: true });
+            }
+        };
+
+        request.onsuccess = (event) => {
+            db = event.target.result;
+            resolve(db);
+        };
+        request.onerror = (event) => reject(event.target.error);
+    });
+}
+
+async function dbPut(storeName, data) {
+    const database = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        const req = store.put(data);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function dbAdd(storeName, data) {
+    const database = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        const req = store.add(data);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function dbGetAll(storeName) {
+    const database = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function dbGetUnsynced() {
+    const database = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction('events', 'readonly');
+        const store = tx.objectStore('events');
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result.filter(e => !e.synced));
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function dbMarkSynced(localId) {
+    const database = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction('events', 'readwrite');
+        const store = tx.objectStore('events');
+        const getReq = store.get(localId);
+        getReq.onsuccess = () => {
+            const data = getReq.result;
+            if (data) {
+                data.synced = true;
+                store.put(data);
+            }
+            resolve();
+        };
+        getReq.onerror = () => reject(getReq.error);
+    });
+}
+
+// =========================================================================
+// PHONE UTILS (JS version)
+// =========================================================================
+function toInternational(phone) {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.startsWith('213') && digits.length === 12) return '+' + digits;
+    if (digits.startsWith('0') && digits.length === 10) return '+213' + digits.slice(1);
+    if (digits.length === 9 && ['5','6','7'].includes(digits[0])) return '+213' + digits;
+    console.warn(`Phone '${phone}' unrecognized. Using as-is.`);
+    return phone;
+}
+
+function isValidAlgerianMobile(phone) {
+    return /^\+213[5-7]\d{8}$/.test(phone);
+}
+
+// =========================================================================
+// NAME FORMATTING
+// =========================================================================
+function formatNameList(names) {
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} et ${names[1]}`;
+    return names.slice(0, -1).join(', ') + ' et ' + names[names.length - 1];
+}
+
+// =========================================================================
+// HAVERSINE
+// =========================================================================
+function haversineMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const p1 = lat1 * Math.PI / 180;
+    const p2 = lat2 * Math.PI / 180;
+    const dp = (lat2 - lat1) * Math.PI / 180;
+    const dl = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// =========================================================================
+// SMS TEMPLATES
+// =========================================================================
+const SMS = {
+    approach: (familyName) =>
+        `Bonjour, le bus Ramsys School arrive bientôt à votre arrêt. Veuillez préparer vos enfants.`,
+
+    allBoarded: (names, familyName) =>
+        `${formatNameList(names)} ${familyName} ${names.length > 1 ? 'sont montés' : 'est monté(e)'} dans le bus Ramsys. Bonne journée!`,
+
+    partial: (boardedNames, absentNames, familyName) =>
+        `${formatNameList(boardedNames)} ${familyName} ${boardedNames.length > 1 ? 'sont montés' : 'est monté(e)'}. ${formatNameList(absentNames)} ${absentNames.length > 1 ? 'sont absents' : 'est absent(e)'} ce matin.`,
+
+    allAbsentTimer: (names, familyName) =>
+        `Le bus Ramsys a patienté 3 min à votre arrêt. ${formatNameList(names)} ${familyName} ${names.length > 1 ? 'sont absents' : 'est absent(e)'}. Le bus a continué.`,
+
+    allAbsentImmediate: (names, familyName) =>
+        `Le bus Ramsys est passé à votre arrêt. ${formatNameList(names)} ${familyName} ${names.length > 1 ? 'sont absents' : 'est absent(e)'} ce matin.`,
+
+    approachAfternoon: () =>
+        `Bonjour, le bus Ramsys rentre à la maison. Il sera à votre arrêt dans environ 2 minutes.`,
+
+    droppedOff: (names, familyName) =>
+        `${formatNameList(names)} ${familyName} ${names.length > 1 ? 'ont été déposés' : 'a été déposé(e)'} à l'arrêt. Bonne soirée!`
+};
+
+// =========================================================================
+// SMS SENDING
+// =========================================================================
+async function sendSMS(rawPhone, message) {
+    const phone = toInternational(rawPhone);
+
+    if (!isValidAlgerianMobile(phone)) {
+        await logFailedSMS(phone, message, 'Invalid phone format');
+        return;
+    }
+
+    try {
+        const response = await fetch(SMS_GATEWAY_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: phone, message: message })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Gateway returned ${response.status}`);
+        }
+    } catch (error) {
+        await logFailedSMS(phone, message, error.message);
+        showWarning(`SMS non envoyé à ${phone}. Enregistré pour réessai.`);
+    }
+}
+
+async function logFailedSMS(phone, message, reason) {
+    await dbAdd('failed_sms', {
+        phone, message, reason,
+        attempted_at: new Date().toISOString(),
+        retry_count: 0
+    });
+}
+
+// =========================================================================
+// UI HELPERS
+// =========================================================================
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+function showWarning(text) {
+    // Simple toast
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#fef3c7;color:#92400e;padding:12px 20px;border-radius:10px;font-size:14px;z-index:3000;max-width:90%;text-align:center;';
+    toast.textContent = text;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+function showError(text) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#fee2e2;color:#991b1b;padding:12px 20px;border-radius:10px;font-size:14px;z-index:3000;max-width:90%;text-align:center;';
+    toast.textContent = text;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+function updateConnectivityIndicator(status) {
+    const el = document.getElementById('connectivity');
+    el.className = status;
+}
+
+// =========================================================================
+// CHARGER ENFORCEMENT
+// =========================================================================
+async function enforceChargerAtStartup() {
+    if (routeActive) return;
+
+    try {
+        const battery = await navigator.getBattery();
+        if (!battery.charging) {
+            document.getElementById('charger-modal').classList.add('active');
+            battery.addEventListener('chargingchange', () => {
+                if (battery.charging) {
+                    document.getElementById('charger-modal').classList.remove('active');
+                }
+            });
+        }
+    } catch (e) {
+        // Battery API not available — skip enforcement
+        console.warn('Battery API not available');
+    }
+}
+
+// Mid-route charging check (banner only, never block)
+setInterval(async () => {
+    if (!routeActive) return;
+    try {
+        const battery = await navigator.getBattery();
+        if (!battery.charging && battery.level < 0.5) {
+            document.getElementById('charging-banner').classList.add('active');
+        } else {
+            document.getElementById('charging-banner').classList.remove('active');
+        }
+    } catch (e) {}
+}, 30000);
+
+// =========================================================================
+// LOAD ROUTE
+// =========================================================================
+async function loadRoute(busId) {
+    const statusEl = document.getElementById('load-status');
+    statusEl.textContent = 'Chargement de la route...';
+
+    const today = new Date().toISOString().split('T')[0];
+    const url = `/api/export-route/${busId}/${today}`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || `HTTP ${response.status}`);
+        }
+        const data = await response.json();
+
+        // Cache to IndexedDB
+        await dbPut('sessions', {
+            session_id: data.route_id,
+            playlist: data,
+            loaded_at: new Date().toISOString(),
+            synced: false
+        });
+
+        statusEl.textContent = '🟢 Route chargée!';
+        return data;
+
+    } catch (fetchError) {
+        // Try cached version
+        statusEl.textContent = '🟡 Pas de connexion — recherche du cache...';
+        try {
+            const cached = await dbGetAll('sessions');
+            if (cached.length > 0) {
+                const latest = cached.sort((a, b) => b.loaded_at.localeCompare(a.loaded_at))[0];
+                statusEl.textContent = '🟡 Route en cache chargée (mode hors ligne)';
+                return latest.playlist;
+            }
+        } catch (e) {}
+
+        statusEl.textContent = `❌ ${fetchError.message}`;
+        throw fetchError;
+    }
+}
+
+// =========================================================================
+// RENDER STOPS
+// =========================================================================
+function renderStops() {
+    const list = document.getElementById('stop-list');
+    list.innerHTML = '';
+
+    playlist.stops.forEach((stop, index) => {
+        const card = document.createElement('div');
+        card.className = 'stop-card';
+        card.id = `stop-${index}`;
+
+        if (index < currentStopIndex) card.classList.add('completed');
+        else if (index === currentStopIndex) card.classList.add('current');
+
+        const stopClass = stop._status || (stop.morning_status !== 'pending' ? stop.morning_status : null);
+
+        // Header
+        let headerHTML = `
+            <div class="stop-header">
+                <span class="stop-number">${stop.stop_sequence}</span>
+                <span class="family-name">${stop.family_name}</span>
+                <span class="pickup-time">${stop.estimated_pickup_time}</span>
+            </div>
+        `;
+
+        // Student toggles (only for current stop)
+        let studentsHTML = '';
+        if (index === currentStopIndex && !stop._status) {
+            studentsHTML = '<div class="students-row">';
+            stop.students.forEach((student) => {
+                const isPresent = !(stop._absentStudents && stop._absentStudents.includes(student.student_id));
+                studentsHTML += `
+                    <span class="student-toggle ${isPresent ? 'present' : 'absent'}"
+                          data-student-id="${student.student_id}"
+                          data-stop-index="${index}"
+                          onclick="toggleStudent(${index}, ${student.student_id}, this)">
+                        ${isPresent ? '✓' : '✗'} ${student.first_name}
+                        <span class="cycle-badge">${student.cycle.charAt(0)}</span>
+                    </span>
+                `;
+            });
+            studentsHTML += '</div>';
+        } else {
+            // Show students as read-only
+            studentsHTML = '<div class="students-row">';
+            stop.students.forEach((student) => {
+                const isAbsent = stop._absentStudents && stop._absentStudents.includes(student.student_id);
+                studentsHTML += `
+                    <span class="student-toggle ${isAbsent ? 'absent' : 'present'}" style="cursor:default;opacity:0.8">
+                        ${isAbsent ? '✗' : '✓'} ${student.first_name}
+                    </span>
+                `;
+            });
+            studentsHTML += '</div>';
+        }
+
+        // Status badge
+        let badgeHTML = '';
+        if (stop._status) {
+            badgeHTML = `<span class="status-badge ${stop._status}">${
+                stop._status === 'boarded' ? '✓ Montés' :
+                stop._status === 'partial' ? '⚠ Partiel' :
+                stop._status === 'absent' ? '✗ Absent' : ''
+            }</span>`;
+        } else if (index === currentStopIndex) {
+            badgeHTML = '<span class="status-badge at-stop">📍 Arrêt actuel</span>';
+        }
+
+        // Timer (only for current stop)
+        let timerHTML = '';
+        if (index === currentStopIndex && timerStarted) {
+            timerHTML = `
+                <div id="timer-container" class="active">
+                    <div id="timer-bar" style="width:100%"></div>
+                    <div id="timer-label">3:00</div>
+                </div>
+            `;
+        }
+
+        // Actions (only for current stop)
+        let actionsHTML = '';
+        if (index === currentStopIndex && !stop._status) {
+            actionsHTML = `
+                <div class="stop-actions">
+                    <button class="btn-all-absent" id="btn-all-absent" onclick="markAllAbsent(${index})">TOUS ABSENTS</button>
+                    <button class="btn-depart" onclick="departStop(${index})">DÉPART</button>
+                </div>
+                <div class="stop-actions" style="margin-top:6px">
+                    <button class="btn-approach-manual" onclick="manualApproachSMS(${index})">📱 Envoyer SMS d'approche</button>
+                </div>
+            `;
+        }
+
+        card.innerHTML = headerHTML + studentsHTML + badgeHTML + timerHTML + actionsHTML;
+        list.appendChild(card);
+    });
+
+    // Scroll to current stop
+    const currentCard = document.getElementById(`stop-${currentStopIndex}`);
+    if (currentCard) {
+        setTimeout(() => currentCard.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+    }
+
+    // Update header
+    document.getElementById('header-progress').textContent = currentStopIndex;
+    document.getElementById('header-total').textContent = playlist.total_stops;
+}
+
+// =========================================================================
+// STUDENT TOGGLE
+// =========================================================================
+function toggleStudent(stopIndex, studentId, el) {
+    const stop = playlist.stops[stopIndex];
+    if (!stop._absentStudents) stop._absentStudents = [];
+
+    const idx = stop._absentStudents.indexOf(studentId);
+    if (idx >= 0) {
+        // Was absent, mark present
+        stop._absentStudents.splice(idx, 1);
+        el.classList.remove('absent');
+        el.classList.add('present');
+        el.firstChild.textContent = '✓ ';
+    } else {
+        // Was present, mark absent
+        stop._absentStudents.push(studentId);
+        el.classList.remove('present');
+        el.classList.add('absent');
+        el.firstChild.textContent = '✗ ';
+    }
+}
+
+// =========================================================================
+// DEPART STOP
+// =========================================================================
+async function departStop(stopIndex) {
+    const stop = playlist.stops[stopIndex];
+    const absentIds = stop._absentStudents || [];
+    const presentStudents = stop.students.filter(s => !absentIds.includes(s.student_id));
+    const absentStudents = stop.students.filter(s => absentIds.includes(s.student_id));
+
+    const boardedNames = presentStudents.map(s => s.first_name);
+    const absentNames = absentStudents.map(s => s.first_name);
+
+    let eventType, smsMessage;
+
+    if (absentStudents.length === 0) {
+        // All boarded
+        eventType = 'boarded';
+        smsMessage = SMS.allBoarded(boardedNames, stop.family_name);
+    } else if (presentStudents.length === 0) {
+        // All absent (shouldn't normally happen here — use TOUS ABSENTS button)
+        eventType = 'absent';
+        smsMessage = SMS.allAbsentImmediate(boardedNames.length > 0 ? boardedNames : absentNames, stop.family_name);
+    } else {
+        // Partial
+        eventType = 'partial';
+        smsMessage = SMS.partial(boardedNames, absentNames, stop.family_name);
+    }
+
+    // Record event
+    await recordEvent({
+        session_id: SESSION_ID,
+        family_id: stop.family_id,
+        stop_sequence: stop.stop_sequence,
+        event_type: eventType,
+        boarded_students: presentStudents.map(s => s.student_id),
+        absent_students: absentStudents.map(s => s.student_id),
+        boarded_names: boardedNames.join(','),
+        absent_names: absentNames.join(','),
+        timestamp_local: new Date().toISOString()
+    });
+
+    // Send SMS
+    sendSMS(stop.parent_phone, smsMessage);
+
+    // Update stop status
+    stop._status = eventType;
+    stop.morning_status = eventType;
+
+    // Clear timer
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    timerStarted = false;
+    approachSmsFired = false;
+
+    // Advance
+    advanceToNextStop();
+}
+
+// =========================================================================
+// MARK ALL ABSENT
+// =========================================================================
+async function markAllAbsent(stopIndex) {
+    const stop = playlist.stops[stopIndex];
+    const allNames = stop.students.map(s => s.first_name);
+
+    const smsMessage = SMS.allAbsentImmediate(allNames, stop.family_name);
+
+    // Record event
+    await recordEvent({
+        session_id: SESSION_ID,
+        family_id: stop.family_id,
+        stop_sequence: stop.stop_sequence,
+        event_type: 'absent',
+        boarded_students: [],
+        absent_students: stop.students.map(s => s.student_id),
+        boarded_names: '',
+        absent_names: allNames.join(','),
+        timestamp_local: new Date().toISOString()
+    });
+
+    // Send SMS
+    sendSMS(stop.parent_phone, smsMessage);
+
+    // Update
+    stop._status = 'absent';
+    stop.morning_status = 'absent';
+    stop._absentStudents = stop.students.map(s => s.student_id);
+
+    // Mark afternoon as skip
+    stop.afternoon_status = 'skip';
+
+    // Clear timer
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    timerStarted = false;
+    approachSmsFired = false;
+
+    // Advance
+    advanceToNextStop();
+}
+
+// =========================================================================
+// RECORD EVENT
+// =========================================================================
+async function recordEvent(eventData) {
+    const id = await dbAdd('events', { ...eventData, synced: false });
+    // Non-blocking background sync
+    attemptBackgroundSync().catch(() => {});
+    return id;
+}
+
+// =========================================================================
+// ADVANCE TO NEXT STOP
+// =========================================================================
+function advanceToNextStop() {
+    // Reset stop-specific flags
+    approachSmsFired = false;
+    timerStarted = false;
+
+    currentStopIndex++;
+
+    // Record school arrival event
+    if (currentStopIndex >= playlist.stops.length) {
+        recordEvent({
+            session_id: SESSION_ID,
+            family_id: 0,
+            stop_sequence: 0,
+            event_type: 'arrived_school',
+            boarded_students: [],
+            absent_students: [],
+            boarded_names: '',
+            absent_names: '',
+            timestamp_local: new Date().toISOString()
+        });
+        showEndScreen();
+        return;
+    }
+
+    renderStops();
+}
+
+// =========================================================================
+// GPS TRACKING
+// =========================================================================
+function startGPSTracking() {
+    if (!navigator.geolocation) {
+        document.getElementById('gps-status').textContent = '⚠️ GPS non disponible — utilisez le bouton manuel';
+        document.getElementById('gps-status').className = 'error';
+        return;
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+        (position) => {
+            const { latitude, longitude } = position.coords;
+            document.getElementById('gps-status').textContent = `📡 GPS: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+            document.getElementById('gps-status').className = 'active';
+
+            if (!routeActive || currentStopIndex >= playlist.stops.length) return;
+
+            const nextStop = playlist.stops[currentStopIndex];
+            if (nextStop._status) return; // already processed
+
+            const dist = haversineMeters(latitude, longitude, nextStop.lat, nextStop.lng);
+
+            // Approach SMS at 600m
+            if (dist < APPROACH_DISTANCE_METERS && !approachSmsFired) {
+                approachSmsFired = true;
+                sendSMS(nextStop.parent_phone, SMS.approach(nextStop.family_name));
+                showWarning(`SMS d'approche envoyé à ${nextStop.family_name}`);
+            }
+
+            // Start timer at 50m
+            if (dist < ARRIVAL_DISTANCE_METERS && !timerStarted) {
+                timerStarted = true;
+                startStopTimer(DRIVER_STOP_WAIT_SECONDS);
+            }
+        },
+        (error) => {
+            document.getElementById('gps-status').textContent = `⚠️ GPS erreur: ${error.message} — bouton manuel disponible`;
+            document.getElementById('gps-status').className = 'error';
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 5000,
+            timeout: 10000
+        }
+    );
+}
+
+// =========================================================================
+// STOP TIMER
+// =========================================================================
+function startStopTimer(seconds) {
+    let remaining = seconds;
+
+    const container = document.getElementById('timer-container');
+    const bar = document.getElementById('timer-bar');
+    const label = document.getElementById('timer-label');
+
+    if (!container) {
+        // Timer element may not exist yet — re-render
+        renderStops();
+        return;
+    }
+
+    container.classList.add('active');
+
+    timerInterval = setInterval(() => {
+        remaining--;
+
+        const pct = (remaining / seconds) * 100;
+        bar.style.width = pct + '%';
+        bar.style.backgroundColor = remaining < 30 ? '#ef4444' : '#3b82f6';
+
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        label.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+        if (remaining <= 0) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            showTimerExpiredPrompt();
+        }
+    }, 1000);
+}
+
+function showTimerExpiredPrompt() {
+    const btn = document.getElementById('btn-all-absent');
+    if (btn) btn.classList.add('flash-red');
+    if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+}
+
+// =========================================================================
+// MANUAL APPROACH SMS
+// =========================================================================
+function manualApproachSMS(stopIndex) {
+    const stop = playlist.stops[stopIndex];
+    sendSMS(stop.parent_phone, SMS.approach(stop.family_name));
+    showWarning(`SMS d'approche envoyé à ${stop.family_name}`);
+    approachSmsFired = true;
+}
+
+// =========================================================================
+// BACKGROUND SYNC
+// =========================================================================
+async function attemptBackgroundSync() {
+    if (!BUS_ID) return;
+
+    const unsynced = await dbGetUnsynced();
+    if (unsynced.length === 0) return;
+
+    try {
+        const events = unsynced.map(e => {
+            const { local_id, synced, ...rest } = e;
+            return { ...rest, session: playlist ? playlist.session : 'morning' };
+        });
+
+        const response = await fetch(`/api/trip-summary/${BUS_ID}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(events)
+        });
+
+        if (response.ok) {
+            for (const event of unsynced) {
+                await dbMarkSynced(event.local_id);
+            }
+            updateConnectivityIndicator('green');
+        }
+    } catch {
+        updateConnectivityIndicator('red');
+    }
+}
+
+setInterval(attemptBackgroundSync, SYNC_INTERVAL);
+
+// =========================================================================
+// END OF ROUTE SCREEN
+// =========================================================================
+function showEndScreen() {
+    routeActive = false;
+    if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+
+    // Calculate stats
+    let boarded = 0, absent = 0, partial = 0;
+    let reportLines = [];
+
+    reportLines.push('══════════════════════════════════════════');
+    reportLines.push('  RAMSYS SCHOOL — RAPPORT DE PRÉSENCE');
+    reportLines.push(`  Bus ${BUS_ID} — Conducteur: ${playlist.driver_name}`);
+    reportLines.push(`  Date: ${playlist.date} — Trajet Matin`);
+    reportLines.push('══════════════════════════════════════════');
+    reportLines.push('');
+
+    const presentList = [];
+    const absentList = [];
+
+    playlist.stops.forEach(stop => {
+        const status = stop._status || stop.morning_status;
+        const boardedStudents = stop.students.filter(s => !(stop._absentStudents || []).includes(s.student_id));
+        const absentStudents = stop.students.filter(s => (stop._absentStudents || []).includes(s.student_id));
+
+        if (status === 'boarded') {
+            boarded += boardedStudents.length;
+            boardedStudents.forEach(s => presentList.push(`  ✓  ${s.first_name} ${stop.family_name} (${s.cycle}) — ${stop.estimated_pickup_time}`));
+        } else if (status === 'partial') {
+            partial++;
+            boarded += boardedStudents.length;
+            absent += absentStudents.length;
+            boardedStudents.forEach(s => presentList.push(`  ✓  ${s.first_name} ${stop.family_name} (${s.cycle}) — ${stop.estimated_pickup_time}`));
+            absentStudents.forEach(s => absentList.push(`  ✗  ${s.first_name} ${stop.family_name} — Absent(e) à ${stop.estimated_pickup_time}`));
+        } else if (status === 'absent') {
+            absent += stop.students.length;
+            stop.students.forEach(s => absentList.push(`  ✗  ${s.first_name} ${stop.family_name} — Absent(e) à ${stop.estimated_pickup_time}`));
+        }
+    });
+
+    reportLines.push(`PRÉSENTS (${boarded} élèves):`);
+    reportLines.push(...presentList);
+    reportLines.push('');
+    reportLines.push(`ABSENTS (${absent} élèves):`);
+    reportLines.push(...absentList);
+    reportLines.push('');
+    reportLines.push('══════════════════════════════════════════');
+
+    document.getElementById('stat-present').textContent = boarded;
+    document.getElementById('stat-absent').textContent = absent;
+    document.getElementById('stat-partial').textContent = partial;
+    document.getElementById('attendance-report').textContent = reportLines.join('\n');
+
+    showScreen('end-screen');
+}
+
+// =========================================================================
+// INIT & EVENT LISTENERS
+// =========================================================================
+document.addEventListener('DOMContentLoaded', async () => {
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+        try {
+            await navigator.serviceWorker.register('sw.js');
+        } catch (e) {
+            console.warn('SW registration failed:', e);
+        }
+    }
+
+    // Open IndexedDB
+    await openIndexedDB();
+
+    // Charger enforcement at startup
+    await enforceChargerAtStartup();
+
+    // Bus ID input
+    const input = document.getElementById('bus-id-input');
+    const btnLoad = document.getElementById('btn-load-route');
+
+    input.addEventListener('input', () => {
+        btnLoad.disabled = !input.value.trim();
+    });
+
+    // Load route
+    btnLoad.addEventListener('click', async () => {
+        const busId = parseInt(input.value.trim());
+        if (!busId) return;
+
+        btnLoad.disabled = true;
+        try {
+            playlist = await loadRoute(busId);
+            BUS_ID = busId;
+            SESSION_ID = playlist.route_id;
+            currentStopIndex = 0;
+            routeActive = true;
+
+            // Initialize absent arrays
+            playlist.stops.forEach(stop => {
+                stop._absentStudents = [];
+            });
+
+            // Update header
+            document.getElementById('header-bus').textContent = `Bus ${busId}`;
+            document.getElementById('header-driver').textContent = playlist.driver_name;
+            document.getElementById('header-students').textContent = `${playlist.total_students} élèves`;
+
+            // Record route started
+            await recordEvent({
+                session_id: SESSION_ID,
+                family_id: 0,
+                stop_sequence: 0,
+                event_type: 'route_started',
+                boarded_students: [],
+                absent_students: [],
+                boarded_names: '',
+                absent_names: '',
+                timestamp_local: new Date().toISOString()
+            });
+
+            // Render and show route
+            renderStops();
+            showScreen('route-screen');
+
+            // Start GPS
+            startGPSTracking();
+
+        } catch (e) {
+            btnLoad.disabled = false;
+        }
+    });
+
+    // Sync button
+    document.getElementById('btn-sync').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-sync');
+        btn.textContent = '⏳ Synchronisation...';
+        btn.disabled = true;
+        try {
+            await attemptBackgroundSync();
+            const remaining = await dbGetUnsynced();
+            if (remaining.length === 0) {
+                btn.textContent = '✅ Synchronisé!';
+            } else {
+                btn.textContent = `⚠️ ${remaining.length} en attente`;
+            }
+        } catch {
+            btn.textContent = '❌ Échec — réessayez';
+        }
+        btn.disabled = false;
+    });
+
+    // Print button
+    document.getElementById('btn-print').addEventListener('click', () => {
+        window.print();
+    });
+
+    // New route
+    document.getElementById('btn-new-route').addEventListener('click', () => {
+        if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+        playlist = null;
+        currentStopIndex = 0;
+        routeActive = false;
+        approachSmsFired = false;
+        timerStarted = false;
+        BUS_ID = null;
+        SESSION_ID = null;
+        document.getElementById('bus-id-input').value = '';
+        document.getElementById('btn-load-route').disabled = true;
+        document.getElementById('load-status').textContent = '';
+        showScreen('load-screen');
+    });
+});
+</script>
+</body>
+</html>

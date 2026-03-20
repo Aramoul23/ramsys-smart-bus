@@ -1,0 +1,13 @@
+ramsys-smart-bus/
+├── README.md
+├── optimizer/
+│   ├── app.py               (Flask backend — 14KB)
+│   ├── init_db.py           (Database schema)
+│   ├── seed_data.py         (Test data)
+│   ├── phone_utils.py       (Phone formatter)
+│   ├── requirements.txt
+│   └── templates/index.html (Admin dashboard)
+└── driver-pwa/
+    ├── index.html           (Driver PWA — 50KB)
+    ├── sw.js                (Service Worker)
+    └── manifest.json        (PWA manifest)
