@@ -15,6 +15,10 @@ from dotenv import load_dotenv
 
 from phone_utils import to_international
 
+# School coordinates (single source of truth)
+SCHOOL_LAT = 36.24502366420027
+SCHOOL_LON = 6.579864240305483
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -156,8 +160,8 @@ def export_route(bus_id, date_str):
         "school_deadline": school_deadline,
         "school": {
             "name": "Ramsys School",
-            "lat": 36.24502366420027,
-            "lng": 6.579864240305483
+            "lat": SCHOOL_LAT,
+            "lng": SCHOOL_LON
         },
         "stops": playlist_stops,
         "total_stops": len(playlist_stops),

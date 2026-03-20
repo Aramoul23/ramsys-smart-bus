@@ -1,4 +1,7 @@
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 def to_international(phone: str) -> str:
     """
@@ -25,7 +28,7 @@ def to_international(phone: str) -> str:
     if len(digits) == 9 and digits[0] in ('5', '6', '7'):
         return '+213' + digits  # already without leading 0 or country code
 
-    print(f"WARNING: Phone '{phone}' is not a recognized Algerian mobile format. Using as-is.")
+    logger.warning(f"Phone '{phone}' is not a recognized Algerian mobile format. Using as-is.")
     return phone
 
 def is_valid_algerian_mobile(phone: str) -> bool:
